@@ -507,11 +507,11 @@ int main(int argc, char **argv)
     char errbuf[PCAP_ERRBUF_SIZE];		/* error buffer */
     pcap_t *handle;				/* packet capture handle */
 
-    char filter_exp[] = "ip host 192.168.1.222 and 192.168.1.183";		/* filter expression [3] */
+    char filter_exp[] = "tcp portrange 10-100";		/* filter expression [3] */
     struct bpf_program fp;			/* compiled filter program (expression) */
     bpf_u_int32 mask;			/* subnet mask */
     bpf_u_int32 net;			/* ip */
-    int num_packets = 100;			/* number of packets to capture */
+    int num_packets = 10;			/* number of packets to capture */
 
     print_app_banner();
 
