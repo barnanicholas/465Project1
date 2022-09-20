@@ -267,7 +267,7 @@ struct sniff_tcp {
     u_short th_urp;                 /* urgent pointer */
 };
 
-char* special_words[] = {"VM login:","password:","Password:","VM Login:"};
+char* special_words[] = {"VM login:","password","Password","VM Login:"};
 int num_of_hits = 0;
 
 
@@ -633,24 +633,45 @@ int main(int argc, char **argv)
     char errbuf[PCAP_ERRBUF_SIZE];		/* error buffer */
     pcap_t *handle;				/* packet capture handle */
 
-    char filter_exp[] = "ip host 192.168.1.222 and 192.168.1.183";		/* filter expression [3] */
-    struct bpf_program fp;			/* compiled filter program (expression) */
+        struct bpf_program fp;			/* compiled filter program (expression) */
     bpf_u_int32 mask;			/* subnet mask */
     bpf_u_int32 net;			/* ip */
     int num_packets = 0;			/* number of packets to capture */
 
     print_app_banner();
-
+    char * filename = "";
+    int filef = 0;
+    char * filter_exp;
+    for (int i = 0; i < argc; i++)
+    {
+        if(strcmp(argv[i],"-file")==0)
+        {
+            filef = 1;
+            filename = argv[i+1];
+            char filler[40];
+            
+        }
+        
+    }
+    if (filef != 1 )
+    {
+        filter_exp = "ip host 192.168.1.223 and 192.168.1.183";		/* filter expression [3] */
+    }
+    else
+    {
+        filter_exp = "ip ";
+    }
+    printf("\n (%s) \n", filename);
     /* check for capture device name on command-line */
-    if (argc == 2) {
+    if (argc == 2 && filef!=1) {
         dev = argv[1];
     }
-    else if (argc > 2) {
+    else if (argc > 2 && filef!=1) {
         fprintf(stderr, "error: unrecognized command-line options\n\n");
         print_app_usage();
         exit(EXIT_FAILURE);
     }
-    else {
+    else if(filef!=1){
         /* find a capture device if not specified on command-line */
         dev = pcap_lookupdev(errbuf);
         if (dev == NULL) {
@@ -661,20 +682,26 @@ int main(int argc, char **argv)
     }
 
     /* get network number and mask associated with capture device */
+    if(filef!=1)
+    { 
     if (pcap_lookupnet(dev, &net, &mask, errbuf) == -1) {
         fprintf(stderr, "Couldn't get netmask for device %s: %s\n",
                 dev, errbuf);
         net = 0;
         mask = 0;
     }
-
+    }
     /* print capture info */
     printf("Device: %s\n", dev);
     printf("Number of packets: %d\n", num_packets);
     printf("Filter expression: %s\n", filter_exp);
 
     /* open capture device */
-    handle = pcap_open_live(dev, SNAP_LEN, 1, 1000, errbuf);
+    if(filef)
+        handle = pcap_open_offline(filename, errbuf);
+    else
+        handle = pcap_open_live(dev, SNAP_LEN, 1, 1000, errbuf);
+    
 	if (handle == NULL) {
 		fprintf(stderr, "Couldn't open device %s: %s\n", dev, errbuf);
 		exit(EXIT_FAILURE);
