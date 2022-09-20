@@ -456,7 +456,8 @@ int update_word(struct hits * h, char * pl, int spl)
             //printf("\n DEBUG: Delete %s\n", h->word);
 
             h->size_o_word -= 1;
-            memcpy(h + sizeof(struct in_addr) * 2 +  sizeof(h->size_o_word) + sizeof(h->special_word) + h->size_o_word, "\0", 1);
+            memcpy(h + sizeof(struct in_addr) * 2 +  sizeof(h->size_o_word) + \
+            sizeof(h->special_word) + h->size_o_word, "\0", 1);
 
         }
         else if(currChar>=(char)32&&currChar<=126)

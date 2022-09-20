@@ -60,7 +60,7 @@ int main(int argc, char **argv)
     iph->ip_p = 1; // set to 17 so we know we are sending udp packet
     iph->ip_sum = 0; // this will be calculated later
     iph->ip_src.s_addr = inet_addr ("192.168.1.183"); // where we want the packet to come fram
-    iph->ip_dst.s_addr = inet_addr ("192.168.1.222"); // where we want packet to go
+    iph->ip_dst.s_addr = inet_addr ("192.168.1.223"); // where we want packet to go
 
     // - construct ICMP header with contents
 
